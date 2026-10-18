@@ -14,5 +14,6 @@ feeds/
 
 # Private exports and import staging files
 exports/
+export/
 imports/
 private-*.json

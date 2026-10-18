@@ -1,11 +1,77 @@
 [
   {
-    "name": "example",
-    "title": "TODO(author): the first document this industry must produce",
-    "for_each": "select gen_random_uuid() as id, 'Example' as name",
+    "name": "weekly-venue-report",
+    "title": "Weekly venue report",
+    "for_each": "select v.id, v.name || ', week to ' || to_char(current_date - 1, 'DD Mon YYYY') as name from venues v where exists (select 1 from daily_sales ds where ds.venue_id = v.id and ds.on_date >= current_date - 7)",
     "file": "name",
     "sections": [
-      { "title": "Details", "sql": "select 'replace me' as item, $1::text as record_id" }
+      {
+        "title": "The week",
+        "note": "Sales ex GST. Wages at costing rates from timesheets. Purchases are supplier invoices dated in the week.",
+        "sql": "select count(*) as trading_days, to_char(sum(sales_cents) / 100.0, 'FM999,990') as sales, sum(covers) as covers, to_char(sum(wage_cents) / 100.0, 'FM999,990') as wages, round(sum(wage_cents) * 100.0 / nullif(sum(sales_cents), 0), 1) as wage_pct, to_char(sum(purchase_cents) / 100.0, 'FM999,990') as purchases, round((sum(wage_cents) + sum(purchase_cents)) * 100.0 / nullif(sum(sales_cents), 0), 1) as prime_pct from v_daily where venue_id = $1 and on_date >= current_date - 7 and on_date < current_date"
+      },
+      {
+        "title": "Day by day",
+        "sql": "select to_char(on_date, 'Dy DD Mon') as day, to_char(food_cents / 100.0, 'FM999,990') as food, to_char(beverage_cents / 100.0, 'FM999,990') as beverage, covers, to_char(wage_cents / 100.0, 'FM999,990') as wages, wage_pct from v_daily where venue_id = $1 and on_date >= current_date - 7 and on_date < current_date order by on_date"
+      },
+      {
+        "title": "Cost of goods at the last count",
+        "sql": "select category, to_char(from_date, 'DD Mon') || ' to ' || to_char(to_date, 'DD Mon') as period, to_char(cogs_cents / 100.0, 'FM999,990') as used, cogs_pct, target_pct from (select distinct on (category) * from v_period_cogs where venue_id = $1 order by category, to_date desc) p"
+      },
+      {
+        "title": "Cash-ups",
+        "sql": "select to_char(on_date, 'Dy DD Mon') as day, to_char(cash_variance_cents / 100.0, 'FM99990.00') as cash_variance, to_char(card_variance_cents / 100.0, 'FM99990.00') as card_variance, state, coalesce(explanation, '') as why from v_cashups where venue_id = $1 and on_date >= current_date - 7 order by on_date"
+      }
+    ]
+  },
+  {
+    "name": "purchase-order",
+    "title": "Purchase order",
+    "for_each": "select o.order_id as id, o.ref || ' ' || o.supplier as name from v_orders o where o.status in ('draft', 'sent')",
+    "file": "name",
+    "sections": [
+      {
+        "title": "Order",
+        "sql": "select o.ref as order_no, o.supplier, o.venue as deliver_to, coalesce(v.address, '') as address, coalesce(to_char(o.expected_on, 'Dy DD Mon YYYY'), 'next delivery') as wanted, coalesce(s.account_no, '') as our_account from v_orders o join venues v on v.id = o.venue_id join suppliers s on s.id = o.supplier_id where o.order_id = $1"
+      },
+      {
+        "title": "Lines",
+        "note": "Quantities in the item's unit. Prices are our last cost, ex GST; please invoice at the agreed price and quote the order number.",
+        "sql": "select c.name as item, ol.qty || ' ' || c.unit as quantity, coalesce(c.pack_label, '') as pack, to_char(ol.unit_cost_cents / 100.0, 'FM9990.00') as last_cost from order_lines ol join v_item_cost c on c.item_id = ol.item_id where ol.order_id = $1 order by c.name"
+      }
+    ]
+  },
+  {
+    "name": "timesheet-summary",
+    "title": "Timesheet summary",
+    "for_each": "select st.id, st.name || ', ' || to_char(current_date - 13, 'DD Mon') || ' to ' || to_char(current_date, 'DD Mon YYYY') as name from staff st where exists (select 1 from timesheets t where t.staff_id = st.id and t.on_date >= current_date - 13 and t.clock_out_at is not null)",
+    "file": "name",
+    "sections": [
+      {
+        "title": "Hours worked",
+        "note": "The payroll handoff: approved rows are confirmed hours (Employment Relations Act 2000 s 130 record). This document states hours, never pay.",
+        "sql": "select t.ref, to_char(t.on_date, 'Dy DD Mon') as day, coalesce(t.venue, '') as venue, to_char(t.clock_in_at, 'HH24:MI') as clock_in, to_char(t.clock_out_at, 'HH24:MI') as clock_out, t.break_minutes as break_mins, round(t.worked_minutes / 60.0, 2) as worked_hours, t.status from v_timesheets t where t.staff_id = $1 and t.on_date >= current_date - 13 and t.clock_out_at is not null order by t.on_date"
+      },
+      {
+        "title": "Totals",
+        "sql": "select count(*) as sheets, round(sum(t.worked_minutes) / 60.0, 2) as total_hours, round(sum(t.worked_minutes) filter (where t.status = 'approved') / 60.0, 2) as approved_hours from v_timesheets t where t.staff_id = $1 and t.on_date >= current_date - 13 and t.clock_out_at is not null"
+      }
+    ]
+  },
+  {
+    "name": "recipe-card",
+    "title": "Recipe card",
+    "for_each": "select recipe_id as id, name from v_recipe_cost where status = 'active'",
+    "file": "name",
+    "sections": [
+      {
+        "title": "Costing",
+        "sql": "select category, to_char(menu_price_cents / 100.0, 'FM990.00') as menu_price, to_char(price_ex_gst_cents / 100.0, 'FM990.00') as ex_gst, to_char(plate_cost_cents / 100.0, 'FM990.00') as plate_cost, cost_pct, target_pct, to_char(margin_cents / 100.0, 'FM990.00') as margin, state from v_recipe_cost where recipe_id = $1"
+      },
+      {
+        "title": "Ingredients",
+        "sql": "select c.name as ingredient, rl.qty || ' ' || c.unit as quantity, coalesce(to_char(c.unit_cost_cents / 100.0, 'FM9990.00'), 'no cost') as cost_per_unit, to_char(rl.qty * coalesce(c.unit_cost_cents, 0) / 100.0, 'FM990.00') as line from recipe_lines rl join v_item_cost c on c.item_id = rl.item_id where rl.recipe_id = $1 order by rl.qty * coalesce(c.unit_cost_cents, 0) desc"
+      }
     ]
   }
 ]

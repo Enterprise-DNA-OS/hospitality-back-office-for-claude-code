@@ -22,9 +22,39 @@ Fill this in once. A worker with context knows. A worker without it guesses.
 
 | When the operator asks for... | Use this |
 |---|---|
-| <!-- TODO(author): one row per slash command --> | `/...` |
+| "what needs my attention", "what's wrong this morning" | `/attention` |
+| "how did we do yesterday", "how's the cafe going" | `/today` |
+| "what's our wage percentage", "how are the margins" | `/margins` |
+| "what's food cost", "cost of goods" | `/cogs` |
+| "here are last night's takings" | `/sales` |
+| "cash-up", "the till was short" | `/cashup` |
+| "show me the roster", "who's on next week" | `/roster` |
+| "publish the roster" | `/publish` |
+| "who can cover Sunday" | `/open-shifts` |
+| "clock X in / out", "X forgot to clock out" | `/clock` |
+| "timesheets", "who worked what" | `/timesheets` |
+| "approve the timesheets" | `/approve` |
+| "show me the team", "pull up X" | `/team` |
+| "what's in stock", "what's under par" | `/stock` |
+| "stocktake", "count the bar" | `/count` |
+| "do the orders", "order from Bay City" | `/order` |
+| "enter this invoice", "the delivery came" | `/receive` |
+| "what invoices need checking", "pay the suppliers" | `/invoices` |
+| "what's gone up", "price rises" | `/price-watch` |
+| "cost this dish", "what does the steak cost us" | `/recipes` |
+| "which dishes make money" | `/menu` |
+| "log waste", "what are we throwing out" | `/waste` |
+| "are we compliant", "check the rules" | `/compliance` |
+| "Monday review", "how was the week" | `/weekly-review` |
+| "note that the rep said...", "log the conversation" | `/log` |
+| "write the order email", "query this invoice" | `/draft-order` |
+| "message everyone their shifts" | `/draft-roster-message` |
+| "bring our Loaded data across" | `/import` |
+| "export everything", "payroll file" | `/export` |
+| "add a field", "change a target", "rename a venue" | `/customise` |
+| "a page that shows..." | `/new-view` |
 
-If an ask fits nothing here, run the CLI directly (`npm run <cli> -- --help`) and then propose a new command for it.
+If an ask fits nothing here, run the CLI directly (`node scripts/venue.mjs help`) and then propose a new command for it.
 
 ## Hard rules
 
@@ -32,6 +62,9 @@ If an ask fits nothing here, run the CLI directly (`npm run <cli> -- --help`) an
 - Never delete records without an explicit yes in this session. Prefer marking closed or archived.
 - Never invent a record. If a name is ambiguous, list the candidates and ask.
 - The database is the source of truth. If the answer is not in it, say so.
+- Never invent a sales figure, a price or a quantity. Read it off the report, invoice or count the operator gives you, say it back, then record it.
+- The roster gates (right to work, overlaps, rest window) and the count gate have no force flag. The fix is the record or the shift, never a workaround.
+- Money is ex GST everywhere except a recipe's menu price, which is what the customer pays. Rates cost wages; payroll pays people.
 
 ## Where things live
 

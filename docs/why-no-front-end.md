@@ -13,7 +13,9 @@ That layer used to be the whole product, because talking to a database was hard.
 
 ## What you give up
 
-- **A visual board.** Stages are a table you ask about, not cards you drag.
+- **A timeclock kiosk.** Staff do not tap in on a tablet by the door. A manager clocks people in and out by asking (`clock in Emma`), or the times come in from whatever clock you already use. A kiosk is a small front end Enterprise DNA builds onto the same database when a venue wants one.
+- **A live POS feed.** Loaded's top price is for the integrated POS. Here the day's totals are keyed from the end-of-day report or imported from the POS export each morning. The margin needs the day, not every transaction; a direct feed is a connection Enterprise DNA adds for you.
+- **A roster you drag around.** Shifts are records you ask about and change in words, not blocks on a calendar.
 - **A phone app.** It runs where Claude Code runs.
 - **A vendor help desk.** This is open source. Enterprise DNA supports the installed version for businesses that want someone to call.
 

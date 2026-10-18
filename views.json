@@ -2,12 +2,81 @@
   {
     "name": "week",
     "title": "This week",
-    "subtitle": "Hospitality Back Office for Claude Code: what needs attention, rendered by npm run view",
+    "subtitle": "Hospitality Back Office for Claude Code: what needs a decision and how each venue traded, rendered by npm run view",
     "sections": [
       {
-        "title": "Needs attention",
-        "note": "TODO(author): point this at the industry's attention view (overdue, stuck, quiet).",
-        "sql": "select 'replace me' as item, 'TODO(author)' as why"
+        "title": "Needs a decision",
+        "note": "Worst first. A person rostered past their right to work outranks everything.",
+        "sql": "select reason, label, who, place, detail from v_attention order by rank, days desc nulls last limit 20"
+      },
+      {
+        "title": "The last seven days by venue",
+        "note": "Sales ex GST. Wages from approved and submitted timesheets at costing rates.",
+        "sql": "select venue, count(*) as trading_days, to_char(sum(sales_cents) / 100.0, 'FM999,990') as sales, sum(covers) as covers, to_char(sum(wage_cents) / 100.0, 'FM999,990') as wages, round(sum(wage_cents) * 100.0 / nullif(sum(sales_cents), 0), 1) as wage_pct from v_daily where on_date >= current_date - 7 and on_date < current_date group by venue order by venue"
+      },
+      {
+        "title": "Day by day",
+        "sql": "select to_char(on_date, 'Dy DD Mon') as day, venue, to_char(sales_cents / 100.0, 'FM999,990') as sales, covers, to_char(wage_cents / 100.0, 'FM999,990') as wages, wage_pct from v_daily where on_date >= current_date - 7 and on_date < current_date order by on_date desc, venue"
+      },
+      {
+        "title": "Cash-ups that need a look",
+        "sql": "select to_char(on_date, 'Dy DD Mon') as day, venue, to_char(cash_variance_cents / 100.0, 'FM99990.00') as cash_variance, to_char(card_variance_cents / 100.0, 'FM99990.00') as card_variance, state, coalesce(explanation, '') as why from v_cashups where state <> 'balanced' and on_date >= current_date - 14 union all select to_char(on_date, 'Dy DD Mon'), venue, '', '', 'MISSING', '' from v_missing_cashups"
+      },
+      {
+        "title": "Open shifts next week",
+        "sql": "select ref, to_char(on_date, 'Dy DD Mon') as day, to_char(starts_at, 'HH24:MI') as starts, to_char(ends_at, 'HH24:MI') as ends, venue, coalesce(role_needed, 'any role') as needs from v_open_shifts order by on_date"
+      }
+    ]
+  },
+  {
+    "name": "margins",
+    "title": "Margins",
+    "subtitle": "Hospitality Back Office for Claude Code: wages, purchases and cost of goods by venue, rendered by npm run view",
+    "sections": [
+      {
+        "title": "Week by week",
+        "note": "Purchases stand in for cost of goods week to week. Prime cost is wages plus purchases.",
+        "sql": "select venue, to_char(week_of, 'DD Mon') as week_of, trading_days as days, to_char(sales_cents / 100.0, 'FM999,990') as sales, wage_pct, purchase_pct, prime_pct from v_weekly where week_of >= (date_trunc('week', current_date))::date - 21 order by venue, week_of"
+      },
+      {
+        "title": "Cost of goods, count to count",
+        "note": "Opening stock + invoiced between the counts - closing stock, against the same days' sales.",
+        "sql": "select venue, category, to_char(from_date, 'DD Mon') as from_day, to_char(to_date, 'DD Mon') as to_day, to_char(cogs_cents / 100.0, 'FM999,990') as used, to_char(sales_cents / 100.0, 'FM999,990') as sales, cogs_pct, target_pct from v_period_cogs order by venue, to_date desc, category"
+      },
+      {
+        "title": "Cost moves in the last 30 days",
+        "sql": "select name as item, supplier, to_char(previous_cost_cents / 100.0, 'FM9990.00') as was, to_char(unit_cost_cents / 100.0, 'FM9990.00') || '/' || unit as now, change_pct, to_char(cost_since, 'DD Mon') as since from v_item_cost where change_pct is not null and cost_since >= current_date - 30 order by abs(change_pct) desc"
+      },
+      {
+        "title": "The menu by margin a plate",
+        "sql": "select name as recipe, category, to_char(menu_price_cents / 100.0, 'FM990.00') as menu, to_char(plate_cost_cents / 100.0, 'FM990.00') as plate_cost, cost_pct, target_pct, to_char(margin_cents / 100.0, 'FM990.00') as margin, state from v_recipe_cost where status = 'active' order by margin_cents desc nulls last"
+      }
+    ]
+  },
+  {
+    "name": "stock",
+    "title": "Stock and suppliers",
+    "subtitle": "Hospitality Back Office for Claude Code: what to order and what to check before paying, rendered by npm run view",
+    "sections": [
+      {
+        "title": "Under par",
+        "sql": "select venue, supplier, item, on_hand_qty || ' ' || unit as on_hand, par_qty as par, packs_to_par || ' x ' || coalesce(pack_label, pack_size || unit) as order_this from v_stock_on_hand where below_par order by venue, supplier, item"
+      },
+      {
+        "title": "Invoices to check before paying",
+        "sql": "select ref, to_char(invoice_date, 'DD Mon') as dated, venue, supplier, coalesce(supplier_invoice_no, '') as their_no, to_char(total_cents / 100.0, 'FM99,990.00') as ex_gst, coalesce(order_ref, '') as order_ref, state from v_invoices where state in ('DIFFERS FROM ORDER', 'NO INVOICE NUMBER', 'DISPUTED', 'OVERDUE') order by invoice_date"
+      },
+      {
+        "title": "Orders in flight",
+        "sql": "select ref, venue, supplier, to_char(expected_on, 'Dy DD Mon') as expected, to_char(order_cents / 100.0, 'FM99,990') as value, state from v_orders where status in ('draft', 'sent') order by expected_on"
+      },
+      {
+        "title": "Waste, last 14 days",
+        "sql": "select to_char(w.on_date, 'Dy DD Mon') as day, v.name as venue, c.name as item, w.qty || ' ' || c.unit as qty, w.reason, to_char(w.qty * coalesce(c.unit_cost_cents, 0) / 100.0, 'FM9990.00') as cost from waste w join venues v on v.id = w.venue_id join v_item_cost c on c.item_id = w.item_id where w.on_date >= current_date - 14 order by w.on_date desc"
+      },
+      {
+        "title": "Stock counts",
+        "sql": "select sc.ref, v.name as venue, to_char(sc.counted_on, 'DD Mon') as counted, sc.status, (current_date - sc.counted_on) as days_ago from stock_counts sc join venues v on v.id = sc.venue_id order by sc.counted_on desc limit 10"
       }
     ]
   }
